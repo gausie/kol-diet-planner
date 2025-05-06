@@ -46,31 +46,31 @@ function applyCleanser(consumable: Consumable) {
   };
 }
 
+function calculateProfit(consumable: Consumable, options: PlanOptions) {
+  return consumable.turns * options.valueOfAdventure;
+}
+
 export class Planner {
   consumables: Consumable[];
 
   constructor(consumables: Consumable[]) {
     this.consumables = consumables
       .filter((c) => !isVampyre(c))
-      .filter((c) => c.price > 0);
+      .filter((c) => c.price > 0)
+      .map(applyCleanser);
   }
 
-  plan({
-    stomach = 15,
-    liver = 14,
-    spleen = 15,
-    valueOfAdventure,
-    baseMeat = 0,
-    limits = {},
-  }: PlanOptions) {
+  plan(options: PlanOptions) {
+    const { stomach = 15, liver = 14, spleen = 15, limits = {} } = options;
+
     const variables = Object.fromEntries(
       this.consumables.map((c) => [
         c.id,
         {
-          ...applyCleanser(c),
+          ...c,
           name: undefined,
           notes: undefined,
-          profit: c.turns * valueOfAdventure,
+          profit: calculateProfit(c, options),
           [`id:${c.id}`]: 1,
         },
       ]),
