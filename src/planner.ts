@@ -65,16 +65,16 @@ export class Planner {
 
     switch (utensil) {
       case 3323: // salad fork
-        turns = Math.ceil(turns * (isSalad(consumable) ? 1.5 : 1.3));
+        turns += Math.ceil(turns * (isSalad(consumable) ? 0.5 : 0.3));
         break;
       case 3324: // frosty mug
-        turns = Math.floor(turns * (isBeer(consumable) ? 1.5 : 1.3));
+        turns += Math.floor(turns * (isBeer(consumable) ? 0.5 : 0.3));
         break;
     }
 
     // Refined Palate
     if (isWine(consumable)) {
-      turns = Math.floor(turns * 1.25);
+      turns += Math.floor(turns * 0.25);
     }
 
     // Ode to Booze
@@ -125,9 +125,11 @@ export class Planner {
       },
     ];
 
-    if (consumable.stomach > 0) return [makeEntry(), makeEntry(3323)];
-    if (consumable.liver > 0) return [makeEntry(), makeEntry(3324)];
-    return [makeEntry()];
+    const base = makeEntry();
+
+    if (consumable.stomach > 0) return [base, makeEntry(3323)];
+    if (consumable.liver > 0) return [base, makeEntry(3324)];
+    return [base];
   }
 
   plan(options: PlanOptions) {
