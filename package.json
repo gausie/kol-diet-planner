@@ -7,6 +7,7 @@
   "devDependencies": {
     "@types/node": "^22.15.12",
     "data-of-loathing": "^2.0.1",
+    "prettier": "^3.5.3",
     "tsx": "^4.19.4",
     "vitest": "^3.1.3"
   }

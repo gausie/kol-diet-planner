@@ -1,6 +1,15 @@
 import { Coefficients, lessEq, solve } from "yalps";
 
-export type Consumable = { name: string, id: number, price: number, turns: number, stomach: number, liver: number, spleen: number, notes: string };
+export type Consumable = {
+  name: string;
+  id: number;
+  price: number;
+  turns: number;
+  stomach: number;
+  liver: number;
+  spleen: number;
+  notes: string;
+};
 
 type PlanOptions = {
   /** How much stomach space the plan should fill */
@@ -14,7 +23,7 @@ type PlanOptions = {
   /** Base meat drop for monsters, used to value +meat effects */
   baseMeat?: number;
   /** Map of items id to top consumption limit thereof. Applied over a sane set of defaults */
-  limits?: { [itemId: number]: number }
+  limits?: { [itemId: number]: number };
 };
 
 function isVampyre(consumable: Consumable) {
@@ -23,7 +32,9 @@ function isVampyre(consumable: Consumable) {
 
 function applyCleanser(consumable: Consumable) {
   if (consumable.notes === "") return consumable;
-  const match = consumable.notes.toLowerCase().match(/-(\d+) (fullness|drunkenness|spleen)/);
+  const match = consumable.notes
+    .toLowerCase()
+    .match(/-(\d+) (fullness|drunkenness|spleen)/);
   if (!match) return consumable;
   const organ = match[2];
   const space = Number(match[1]);
@@ -40,8 +51,8 @@ export class Planner {
 
   constructor(consumables: Consumable[]) {
     this.consumables = consumables
-      .filter(c => !isVampyre(c))
-      .filter(c => c.price > 0);
+      .filter((c) => !isVampyre(c))
+      .filter((c) => c.price > 0);
   }
 
   plan({
@@ -52,22 +63,32 @@ export class Planner {
     baseMeat = 0,
     limits = {},
   }: PlanOptions) {
-    const variables = Object.fromEntries(this.consumables.map((c) => [
-      c.id,
-      { ...applyCleanser(c), name: undefined, notes: undefined, profit: c.turns * valueOfAdventure, [`id:${c.id}`]: 1 },
-    ]));
+    const variables = Object.fromEntries(
+      this.consumables.map((c) => [
+        c.id,
+        {
+          ...applyCleanser(c),
+          name: undefined,
+          notes: undefined,
+          profit: c.turns * valueOfAdventure,
+          [`id:${c.id}`]: 1,
+        },
+      ]),
+    );
 
-    const limitConstraints = Object.fromEntries(Object.entries({
-      3325: 1, // jar of fermented pickle juice
-      3326: 1, // voodoo snuff
-      3327: 1, // extra-greasy slider
-      8819: 1, // The Plumber's Mushroom Stew
-      8821: 1, // The Mad Liquor
-      8822: 1, // Doc Clock's thyme cocktail
-      8823: 1, // Mr. Burnsger
-      10060: 23, // magical sausage
-      ...limits
-    }).map(([id, limit]) => [`id:${id}`, lessEq(limit)]));
+    const limitConstraints = Object.fromEntries(
+      Object.entries({
+        3325: 1, // jar of fermented pickle juice
+        3326: 1, // voodoo snuff
+        3327: 1, // extra-greasy slider
+        8819: 1, // The Plumber's Mushroom Stew
+        8821: 1, // The Mad Liquor
+        8822: 1, // Doc Clock's thyme cocktail
+        8823: 1, // Mr. Burnsger
+        10060: 23, // magical sausage
+        ...limits,
+      }).map(([id, limit]) => [`id:${id}`, lessEq(limit)]),
+    );
 
     const model = {
       direction: "maximize" as const,
@@ -87,9 +108,11 @@ export class Planner {
 
     return {
       profit: solution.result,
-      turns: solution.variables.reduce((acc, [id, q]) => acc + (variables[id].turns * q), 0),
+      turns: solution.variables.reduce(
+        (acc, [id, q]) => acc + variables[id].turns * q,
+        0,
+      ),
       diet: solution.variables,
-    }
+    };
   }
-
 }
