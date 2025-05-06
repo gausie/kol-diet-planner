@@ -1,5 +1,5 @@
 import { createClient } from "data-of-loathing";
-import { Consumable } from "../src/planner";
+import { Consumable } from "../src/utils";
 import * as fs from "node:fs/promises";
 
 const client = createClient();
