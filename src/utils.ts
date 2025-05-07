@@ -8,7 +8,7 @@ export type Consumable = {
   spleen: number;
   notes: string;
   effect: string;
-  effectDuration: string;
+  effectDuration: number;
 };
 
 export type Effect = {

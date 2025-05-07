@@ -16,6 +16,7 @@ describe("Planner", async () => {
     saucemaven: true,
     class: "Pastamancer",
     sweetSynthesis: true,
+    mayoClinic: true,
   });
 
   it("plans", async () => {

@@ -48,7 +48,7 @@ const consumables =
         turns: r.adventures,
         notes: r.notes || "",
         effect: modifiers["Effect"] || "",
-        effectDuration: modifiers["Effect Duration"] || 0,
+        effectDuration: Number(modifiers["Effect Duration"]) || 0,
       };
     }) ?? [];
 

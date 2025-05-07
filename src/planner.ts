@@ -35,6 +35,7 @@ export type PlannerOptions = {
     | "Disco Bandit"
     | "Accordion Thief";
   sweetSynthesis?: boolean;
+  mayoClinic?: boolean;
 };
 
 export abstract class Planner {
@@ -52,7 +53,10 @@ export abstract class Planner {
     return (this.options.baseMeat ?? 0) * (Number(value) / 100);
   }
 
-  calculateEffectProfit(consumable: Consumable) {
+  calculateEffectProfit(
+    consumable: Consumable,
+    duration = consumable.effectDuration,
+  ) {
     const effect = this.getEffect(consumable.effect);
     if (!effect) return 0;
 
@@ -60,7 +64,7 @@ export abstract class Planner {
     for (const [modifier, value] of Object.entries(effect.modifiers)) {
       switch (modifier) {
         case "Meat Drop":
-          profit += this.valueMeatDrop(value);
+          profit += this.valueMeatDrop(value) * duration;
           break;
       }
     }
@@ -68,7 +72,7 @@ export abstract class Planner {
     return profit;
   }
 
-  calculateProfit(consumable: Consumable, utensil?: number) {
+  calculateProfit(consumable: Consumable, utensil?: number, mayo?: string) {
     let turns = consumable.turns;
 
     // Utensils
@@ -112,6 +116,24 @@ export abstract class Planner {
       }
     }
 
+    // Mayo Clinic
+    let effectDuration = consumable.effectDuration;
+    let extra: Partial<typeof consumable> = {};
+    if (this.options.mayoClinic && consumable.stomach > 0) {
+      switch (mayo) {
+        case "mayoflex":
+          turns += 1;
+          break;
+        case "mayodiol":
+          extra.stomach = consumable.stomach - 1;
+          extra.liver = consumable.liver + 1;
+          break;
+        case "mayozapine":
+          effectDuration *= 2;
+          break;
+      }
+    }
+
     let profit = turns * this.options.valueOfAdventure;
 
     if (utensil) {
@@ -119,10 +141,12 @@ export abstract class Planner {
     }
 
     if (consumable.effect) {
-      profit += this.calculateEffectProfit(consumable);
+      profit += this.calculateEffectProfit(consumable, effectDuration);
     }
 
     return {
+      ...consumable,
+      ...extra,
       turns,
       profit,
       ...(utensil ? { [`utensil:${utensil}`]: 1 } : {}),
@@ -130,22 +154,38 @@ export abstract class Planner {
   }
 
   servingOptions(consumable: Consumable) {
-    const makeEntry = (utensil?: number) => [
-      `${consumable.id}${utensil ? `+${utensil}` : ""}`,
-      {
-        ...consumable,
-        name: undefined,
-        notes: undefined,
-        ...this.calculateProfit(consumable, utensil),
-        [`id:${consumable.id}`]: 1,
-      },
-    ];
+    const makeEntry = (serving: { utensil?: number; mayo?: string } = {}) => {
+      const servings = Object.entries(serving)
+        .filter(([k, v]) => v !== undefined)
+        .map(([k, v]) => `${k}=${v}`)
+        .join(",");
+      return [
+        `${consumable.id}${servings ? `(${servings})` : ""}`,
+        {
+          ...this.calculateProfit(consumable, serving.utensil, serving.mayo),
+          name: undefined,
+          notes: undefined,
+          [`id:${consumable.id}`]: 1,
+        },
+      ];
+    };
 
-    const base = makeEntry();
+    const entries = [makeEntry()];
 
-    if (consumable.stomach > 0) return [base, makeEntry(3323)];
-    if (consumable.liver > 0) return [base, makeEntry(3324)];
-    return [base];
+    if (consumable.stomach > 0) {
+      entries.push(makeEntry({ utensil: 3323 }));
+      if (this.options.mayoClinic) {
+        for (const mayo of ["mayoflex", "mayodiol", "mayozapine"]) {
+          entries.push(makeEntry({ mayo }));
+          entries.push(makeEntry({ utensil: 3323, mayo }));
+        }
+      }
+    }
+    if (consumable.liver > 0) {
+      entries.push(makeEntry({ utensil: 3324 }));
+    }
+
+    return entries;
   }
 
   plan() {
