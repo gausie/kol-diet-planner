@@ -187,8 +187,6 @@ export class Planner {
       };
     }
 
-    console.log(variables["sweetsynthesis"]);
-
     const limitConstraints = Object.fromEntries(
       Object.entries({
         3325: 1, // jar of fermented pickle juice
