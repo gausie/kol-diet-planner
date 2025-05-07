@@ -14,7 +14,7 @@ const result = await client.query({
         name: true,
         itemModifierByItem: {
           modifiers: true,
-        }
+        },
       },
       adventures: true,
       liver: true,
@@ -29,12 +29,12 @@ const result = await client.query({
       name: true,
       effectModifierByEffect: {
         modifiers: true,
-      }
-    }
-  }
+      },
+    },
+  },
 });
 
-const unpricedConsumables =
+const consumables =
   result.allConsumables?.nodes
     ?.filter((r) => r !== null)
     .map((r) => {
@@ -52,29 +52,27 @@ const unpricedConsumables =
       };
     }) ?? [];
 
-const consumables: Consumable[] = [];
+const effects = result.allEffects?.nodes
+  ?.filter((e) => e !== null)
+  .map((e) => ({
+    id: e.id,
+    name: e.name,
+    modifiers: e.effectModifierByEffect?.modifiers || {},
+  }));
 
-// const prices = JSON.parse(await fs.readFile("./consumables.json", "utf-8"));
+const prices: Record<number, number> = {};
 
-for (const c of unpricedConsumables) {
-  const response = await fetch(`https://pricegun.loathers.net/api/${c.id}`);
+for (const id of consumables.map((c) => c.id).concat(3323, 3324)) {
+  const response = await fetch(`https://pricegun.loathers.net/api/${id}`);
   const json = (await response.json()) as { value: number };
-  // const json = prices.filter(p => p.id === c.id).map(p => ({ value: p.price }))[0];
-  consumables.push({ ...c, price: Math.round(json.value) });
+  prices[id] = Math.round(json.value);
 }
 
 await fs.writeFile(
-  `./consumables-${dateString}.json`,
-  JSON.stringify(consumables),
+  `./data-${dateString}.json`,
+  JSON.stringify({
+    consumables,
+    effects,
+    prices,
+  }),
 );
-
-const effects = result.allEffects?.nodes?.filter(e => e !== null).map(e => ({
-  id: e.id,
-  name: e.name,
-  modifiers: e.effectModifierByEffect?.modifiers || {},
-}));
-
-await fs.writeFile(
-  `./effects-${dateString}.json`,
-  JSON.stringify(effects),
-)

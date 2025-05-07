@@ -3,14 +3,8 @@ import * as fs from "node:fs/promises";
 import { Planner } from "./planner";
 
 describe("Planner", async () => {
-  const planner = new Planner(
-    JSON.parse(await fs.readFile("./consumables.json", "utf-8")),
-    JSON.parse(await fs.readFile("./effects.json", "utf-8")),
-    {
-      3323: 383_621,
-      3324: 315_363,
-    },
-  );
+  const data = JSON.parse(await fs.readFile("./data.json", "utf-8"));
+  const planner = new Planner(data.consumables, data.effects, data.prices);
 
   it("plans", async () => {
     const plan = planner.plan({
@@ -18,12 +12,13 @@ describe("Planner", async () => {
       liver: 14,
       spleen: 15,
       valueOfAdventure: 7000,
-      baseMeat: 250,
+      baseMeat: 275,
       odeToBooze: true,
       pizzaLover: true,
       tuxedoShirt: true,
       saucemaven: true,
       class: "Pastamancer",
+      sweetSynthesis: true,
     });
     console.log(plan);
     expect(plan).toMatchObject({});

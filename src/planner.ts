@@ -36,29 +36,27 @@ type PlanOptions = {
     | "Sauceror"
     | "Disco Bandit"
     | "Accordion Thief";
+  sweetSynthesis?: boolean;
 };
 
 export class Planner {
   consumables: Consumable[];
   effects: Effect[];
-  itemToPrice: Record<number, number>;
+  prices: Record<number, number>;
 
   constructor(
     consumables: Consumable[],
     effects: Effect[],
-    otherPrices: Record<number, number> = {},
+    prices: Record<number, number> = {},
   ) {
+    this.prices = prices;
+
     this.consumables = consumables
       .filter((c) => !isVampyre(c))
-      .filter((c) => c.price > 0)
+      .filter((c) => this.prices[c.id] > 0)
       .map(applyCleanser);
 
     this.effects = effects;
-
-    this.itemToPrice = {
-      ...Object.fromEntries(this.consumables.map((c) => [c.id, c.price])),
-      ...otherPrices,
-    };
   }
 
   findEffect(effect: string) {
@@ -71,10 +69,11 @@ export class Planner {
     return this.effects.find((e) => e.name === effectName);
   }
 
-  calculateEffectProfit(
-    consumable: Consumable,
-    options: PlanOptions,
-  ) {
+  valueMeatDrop(value: number | string, options: PlanOptions) {
+    return (options.baseMeat ?? 0) * (Number(value) / 100);
+  }
+
+  calculateEffectProfit(consumable: Consumable, options: PlanOptions) {
     const effect = this.findEffect(consumable.effect);
     if (!effect) return 0;
 
@@ -82,7 +81,7 @@ export class Planner {
     for (const [modifier, value] of Object.entries(effect.modifiers)) {
       switch (modifier) {
         case "Meat Drop":
-          profit += (options.baseMeat ?? 0) * (Number(value) / 100);
+          profit += this.valueMeatDrop(value, options);
           break;
       }
     }
@@ -138,7 +137,7 @@ export class Planner {
     let profit = turns * options.valueOfAdventure;
 
     if (utensil) {
-      profit -= this.itemToPrice[utensil] ?? 0;
+      profit -= this.prices[utensil] ?? 0;
     }
 
     if (consumable.effect) {
@@ -178,7 +177,17 @@ export class Planner {
       this.consumables.flatMap((c) => this.considerUtensil(c, options)),
     );
 
-    console.log();
+    if (options.sweetSynthesis) {
+      variables["sweetsynthesis"] = {
+        profit: this.valueMeatDrop(300, options) * 30,
+        turns: 0,
+        stomach: 0,
+        liver: 0,
+        spleen: 1,
+      };
+    }
+
+    console.log(variables["sweetsynthesis"]);
 
     const limitConstraints = Object.fromEntries(
       Object.entries({
