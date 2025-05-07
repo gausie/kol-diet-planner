@@ -129,7 +129,7 @@ export abstract class Planner {
     };
   }
 
-  considerUtensil(consumable: Consumable) {
+  servingOptions(consumable: Consumable) {
     const makeEntry = (utensil?: number) => [
       `${consumable.id}${utensil ? `+${utensil}` : ""}`,
       {
@@ -152,7 +152,7 @@ export abstract class Planner {
     const { stomach = 15, liver = 14, spleen = 15, limits = {} } = this.options;
 
     const variables = Object.fromEntries(
-      this.getConsumables().flatMap((c) => this.considerUtensil(c)),
+      this.getConsumables().flatMap((c) => this.servingOptions(c)),
     );
 
     if (this.options.sweetSynthesis) {
