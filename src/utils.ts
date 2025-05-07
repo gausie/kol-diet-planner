@@ -7,6 +7,16 @@ export type Consumable = {
   liver: number;
   spleen: number;
   notes: string;
+  effect: string;
+  effectDuration: string;
+};
+
+export type Effect = {
+  name: string;
+  id: number;
+  modifiers: {
+    [key: string]: string;
+  };
 };
 
 export function applyCleanser(consumable: Consumable) {

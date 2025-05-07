@@ -2,6 +2,7 @@ import { lessEq, solve } from "yalps";
 import {
   applyCleanser,
   type Consumable,
+  Effect,
   isBeer,
   isMartini,
   isPizza,
@@ -39,10 +40,12 @@ type PlanOptions = {
 
 export class Planner {
   consumables: Consumable[];
+  effects: Effect[];
   itemToPrice: Record<number, number>;
 
   constructor(
     consumables: Consumable[],
+    effects: Effect[],
     otherPrices: Record<number, number> = {},
   ) {
     this.consumables = consumables
@@ -50,10 +53,41 @@ export class Planner {
       .filter((c) => c.price > 0)
       .map(applyCleanser);
 
+    this.effects = effects;
+
     this.itemToPrice = {
       ...Object.fromEntries(this.consumables.map((c) => [c.id, c.price])),
       ...otherPrices,
     };
+  }
+
+  findEffect(effect: string) {
+    const effectName = effect.slice(1, -1);
+    const match = effectName.match(/\[(\d+)\].*/);
+    if (match) {
+      const id = Number(match[1]);
+      return this.effects.find((e) => e.id === id);
+    }
+    return this.effects.find((e) => e.name === effectName);
+  }
+
+  calculateEffectProfit(
+    consumable: Consumable,
+    options: PlanOptions,
+  ) {
+    const effect = this.findEffect(consumable.effect);
+    if (!effect) return 0;
+
+    let profit = 0;
+    for (const [modifier, value] of Object.entries(effect.modifiers)) {
+      switch (modifier) {
+        case "Meat Drop":
+          profit += (options.baseMeat ?? 0) * (Number(value) / 100);
+          break;
+      }
+    }
+
+    return profit;
   }
 
   calculateProfit(
@@ -63,6 +97,7 @@ export class Planner {
   ) {
     let turns = consumable.turns;
 
+    // Utensils
     switch (utensil) {
       case 3323: // salad fork
         turns += Math.ceil(turns * (isSalad(consumable) ? 0.5 : 0.3));
@@ -106,6 +141,10 @@ export class Planner {
       profit -= this.itemToPrice[utensil] ?? 0;
     }
 
+    if (consumable.effect) {
+      profit += this.calculateEffectProfit(consumable, options);
+    }
+
     return {
       turns,
       profit,
@@ -146,11 +185,16 @@ export class Planner {
         3325: 1, // jar of fermented pickle juice
         3326: 1, // voodoo snuff
         3327: 1, // extra-greasy slider
+        3338: 1, // frozen banquet
         8819: 1, // The Plumber's Mushroom Stew
         8821: 1, // The Mad Liquor
         8822: 1, // Doc Clock's thyme cocktail
         8823: 1, // Mr. Burnsger
+        8824: 1, // The Inquisitor's unidentifiable object
         10060: 23, // magical sausage
+        10991: 1, // Pizza of Legend
+        10992: 1, // Calzone of Legend
+        11000: 1, // Deep Dish of Legend
         ...limits,
       }).map(([id, limit]) => [`id:${id}`, lessEq(limit)]),
     );

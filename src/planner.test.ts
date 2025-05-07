@@ -5,6 +5,7 @@ import { Planner } from "./planner";
 describe("Planner", async () => {
   const planner = new Planner(
     JSON.parse(await fs.readFile("./consumables.json", "utf-8")),
+    JSON.parse(await fs.readFile("./effects.json", "utf-8")),
     {
       3323: 383_621,
       3324: 315_363,
