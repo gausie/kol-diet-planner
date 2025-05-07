@@ -1,6 +1,5 @@
 import { lessEq, solve } from "yalps";
 import {
-  applyCleanser,
   type Consumable,
   Effect,
   isBeer,
@@ -8,11 +7,10 @@ import {
   isPizza,
   isSalad,
   isSaucy,
-  isVampyre,
   isWine,
 } from "./utils";
 
-type PlanOptions = {
+export type PlannerOptions = {
   /** How much stomach space the plan should fill */
   stomach?: number;
   /** How much liver space the plan should fill */
@@ -39,49 +37,30 @@ type PlanOptions = {
   sweetSynthesis?: boolean;
 };
 
-export class Planner {
-  consumables: Consumable[];
-  effects: Effect[];
-  prices: Record<number, number>;
+export abstract class Planner {
+  options: PlannerOptions;
 
-  constructor(
-    consumables: Consumable[],
-    effects: Effect[],
-    prices: Record<number, number> = {},
-  ) {
-    this.prices = prices;
-
-    this.consumables = consumables
-      .filter((c) => !isVampyre(c))
-      .filter((c) => this.prices[c.id] > 0)
-      .map(applyCleanser);
-
-    this.effects = effects;
+  constructor(options: PlannerOptions) {
+    this.options = options;
   }
 
-  findEffect(effect: string) {
-    const effectName = effect.slice(1, -1);
-    const match = effectName.match(/\[(\d+)\].*/);
-    if (match) {
-      const id = Number(match[1]);
-      return this.effects.find((e) => e.id === id);
-    }
-    return this.effects.find((e) => e.name === effectName);
+  abstract getConsumables(): Consumable[];
+  abstract getEffect(name: string): Effect | undefined;
+  abstract getPrice(id: number): number;
+
+  valueMeatDrop(value: number | string) {
+    return (this.options.baseMeat ?? 0) * (Number(value) / 100);
   }
 
-  valueMeatDrop(value: number | string, options: PlanOptions) {
-    return (options.baseMeat ?? 0) * (Number(value) / 100);
-  }
-
-  calculateEffectProfit(consumable: Consumable, options: PlanOptions) {
-    const effect = this.findEffect(consumable.effect);
+  calculateEffectProfit(consumable: Consumable) {
+    const effect = this.getEffect(consumable.effect);
     if (!effect) return 0;
 
     let profit = 0;
     for (const [modifier, value] of Object.entries(effect.modifiers)) {
       switch (modifier) {
         case "Meat Drop":
-          profit += this.valueMeatDrop(value, options);
+          profit += this.valueMeatDrop(value);
           break;
       }
     }
@@ -89,11 +68,7 @@ export class Planner {
     return profit;
   }
 
-  calculateProfit(
-    consumable: Consumable,
-    options: PlanOptions,
-    utensil?: number,
-  ) {
+  calculateProfit(consumable: Consumable, utensil?: number) {
     let turns = consumable.turns;
 
     // Utensils
@@ -112,36 +87,39 @@ export class Planner {
     }
 
     // Ode to Booze
-    if (options.odeToBooze && consumable.liver > 0) {
+    if (this.options.odeToBooze && consumable.liver > 0) {
       turns += consumable.liver;
     }
 
     // Tuxedo shirt
-    if (options.tuxedoShirt && isMartini(consumable)) {
+    if (this.options.tuxedoShirt && isMartini(consumable)) {
       turns += 2;
     }
 
     // Pizza Lover
-    if (options.pizzaLover && isPizza(consumable)) {
+    if (this.options.pizzaLover && isPizza(consumable)) {
       turns += consumable.stomach;
     }
 
     // Saucemaven
-    if (options.saucemaven && isSaucy(consumable)) {
+    if (this.options.saucemaven && isSaucy(consumable)) {
       turns += 3;
-      if (options.class === "Sauceror" || options.class === "Pastamancer") {
+      if (
+        this.options.class === "Sauceror" ||
+        this.options.class === "Pastamancer"
+      ) {
         turns += 2;
       }
     }
 
-    let profit = turns * options.valueOfAdventure;
+    let profit = turns * this.options.valueOfAdventure;
 
     if (utensil) {
-      profit -= this.prices[utensil] ?? 0;
+      profit -= this.getPrice(utensil);
     }
 
     if (consumable.effect) {
-      profit += this.calculateEffectProfit(consumable, options);
+      profit += this.calculateEffectProfit(consumable);
     }
 
     return {
@@ -151,14 +129,14 @@ export class Planner {
     };
   }
 
-  considerUtensil(consumable: Consumable, options: PlanOptions) {
+  considerUtensil(consumable: Consumable) {
     const makeEntry = (utensil?: number) => [
       `${consumable.id}${utensil ? `+${utensil}` : ""}`,
       {
         ...consumable,
         name: undefined,
         notes: undefined,
-        ...this.calculateProfit(consumable, options, utensil),
+        ...this.calculateProfit(consumable, utensil),
         [`id:${consumable.id}`]: 1,
       },
     ];
@@ -170,16 +148,16 @@ export class Planner {
     return [base];
   }
 
-  plan(options: PlanOptions) {
-    const { stomach = 15, liver = 14, spleen = 15, limits = {} } = options;
+  plan() {
+    const { stomach = 15, liver = 14, spleen = 15, limits = {} } = this.options;
 
     const variables = Object.fromEntries(
-      this.consumables.flatMap((c) => this.considerUtensil(c, options)),
+      this.getConsumables().flatMap((c) => this.considerUtensil(c)),
     );
 
-    if (options.sweetSynthesis) {
+    if (this.options.sweetSynthesis) {
       variables["sweetsynthesis"] = {
-        profit: this.valueMeatDrop(300, options) * 30,
+        profit: this.valueMeatDrop(300) * 30,
         turns: 0,
         stomach: 0,
         liver: 0,
