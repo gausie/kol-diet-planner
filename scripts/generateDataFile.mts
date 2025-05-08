@@ -1,5 +1,4 @@
 import { createClient } from "data-of-loathing";
-import { Consumable } from "../src/utils";
 import * as fs from "node:fs/promises";
 
 const date = new Date();

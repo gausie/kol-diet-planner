@@ -1,15 +1,5 @@
 import { lessEq, solve } from "yalps";
-import {
-  type Consumable,
-  Effect,
-  isBeer,
-  isMartini,
-  isPizza,
-  isSalad,
-  isSaucy,
-  isWine,
-  tuple,
-} from "./utils";
+import { type Attributes, parseNotes, tuple } from "./utils";
 
 export type PlannerOptions = {
   /** How much stomach space the plan should fill */
@@ -46,23 +36,35 @@ export abstract class Planner {
     this.options = options;
   }
 
-  abstract getConsumables(): Consumable[];
-  abstract getEffect(name: string): Effect | undefined;
+  abstract getConsumables(): number[];
+  abstract getEffectModifiers(name: string): Record<string, string> | undefined;
   abstract getPrice(id: number): number;
+  abstract getStomach(id: number): number;
+  abstract getLiver(id: number): number;
+  abstract getSpleen(id: number): number;
+  abstract getTurns(id: number): number;
+  abstract getNotes(id: number): string;
+  abstract getItemEffect(id: number): string;
+  abstract getItemEffectDuration(id: number): number;
+
+  getAttributes(id: number): Attributes {
+    const notes = this.getNotes(id);
+    return parseNotes(notes);
+  }
 
   valueMeatDrop(value: number | string) {
     return (this.options.baseMeat ?? 0) * (Number(value) / 100);
   }
 
-  calculateEffectProfit(
-    consumable: Consumable,
-    duration = consumable.effectDuration,
-  ) {
-    const effect = this.getEffect(consumable.effect);
+  calculateEffectProfit(id: number, duration = this.getItemEffectDuration(id)) {
+    const effect = this.getItemEffect(id);
     if (!effect) return 0;
 
+    const modifiers = this.getEffectModifiers(effect);
+    if (!modifiers) return 0;
+
     let profit = 0;
-    for (const [modifier, value] of Object.entries(effect.modifiers)) {
+    for (const [modifier, value] of Object.entries(modifiers)) {
       switch (modifier) {
         case "Meat Drop":
           profit += this.valueMeatDrop(value) * duration;
@@ -73,41 +75,55 @@ export abstract class Planner {
     return profit;
   }
 
-  calculateProfit(consumable: Consumable, utensil?: number, mayo?: string) {
-    let turns = consumable.turns;
+  evaluateConsumable(id: number, utensil?: number, mayo?: string) {
+    const attributes = this.getAttributes(id);
+
+    // Vampyre food cannot be eaten in a normal ascension
+    if (attributes.vampyre) return null;
+
+    const price = this.getPrice(id);
+
+    // Untradeable or otherwise unavailable
+    if (price === 0) return null;
+
+    // Lets work out what resources this consumable will provide and consume
+    let turns = this.getTurns(id);
+    let liver = this.getLiver(id) - (attributes.cleansesLiver ?? 0);
+    let stomach = this.getStomach(id) - (attributes.cleansesStomach ?? 0);
+    let spleen = this.getSpleen(id) - (attributes.cleansesSpleen ?? 0);
 
     // Utensils
     switch (utensil) {
       case 3323: // salad fork
-        turns += Math.ceil(turns * (isSalad(consumable) ? 0.5 : 0.3));
+        turns += Math.ceil(turns * (attributes.salad ? 0.5 : 0.3));
         break;
       case 3324: // frosty mug
-        turns += Math.floor(turns * (isBeer(consumable) ? 0.5 : 0.3));
+        turns += Math.floor(turns * (attributes.beer ? 0.5 : 0.3));
         break;
     }
 
     // Refined Palate
-    if (isWine(consumable)) {
+    if (attributes.wine) {
       turns += Math.floor(turns * 0.25);
     }
 
     // Ode to Booze
-    if (this.options.odeToBooze && consumable.liver > 0) {
-      turns += consumable.liver;
+    if (this.options.odeToBooze && liver > 0) {
+      turns += liver;
     }
 
     // Tuxedo shirt
-    if (this.options.tuxedoShirt && isMartini(consumable)) {
+    if (this.options.tuxedoShirt && attributes.martini) {
       turns += 2;
     }
 
     // Pizza Lover
-    if (this.options.pizzaLover && isPizza(consumable)) {
-      turns += consumable.stomach;
+    if (this.options.pizzaLover && attributes.pizza) {
+      turns += stomach;
     }
 
     // Saucemaven
-    if (this.options.saucemaven && isSaucy(consumable)) {
+    if (this.options.saucemaven && attributes.saucy) {
       turns += 3;
       if (
         this.options.class === "Sauceror" ||
@@ -118,16 +134,15 @@ export abstract class Planner {
     }
 
     // Mayo Clinic
-    let effectDuration = consumable.effectDuration;
-    let extra: Partial<typeof consumable> = {};
-    if (this.options.mayoClinic && consumable.stomach > 0) {
+    let effectDuration = this.getItemEffectDuration(id);
+    if (this.options.mayoClinic && stomach > 0) {
       switch (mayo) {
         case "mayoflex":
           turns += 1;
           break;
         case "mayodiol":
-          extra.stomach = consumable.stomach - 1;
-          extra.liver = consumable.liver + 1;
+          stomach -= 1;
+          liver += 1;
           break;
         case "mayozapine":
           effectDuration *= 2;
@@ -135,42 +150,45 @@ export abstract class Planner {
       }
     }
 
-    let profit = turns * this.options.valueOfAdventure;
+    // Now lets calculate profit based on the turns we know this will generate
+    let profit = turns * this.options.valueOfAdventure - price;
 
+    // If we are using a utensil for this consumable, take into account the extra cost
     if (utensil) {
       profit -= this.getPrice(utensil);
     }
 
-    if (consumable.effect) {
-      profit += this.calculateEffectProfit(consumable, effectDuration);
-    }
+    // And if the item grants an effect, take into account its expected value
+    profit += this.calculateEffectProfit(id, effectDuration);
+
+    // Filtering out negative profit entries here is an effective optimisation before the solver is run.
+    if (profit < 0) return null;
 
     return {
-      ...consumable,
-      ...extra,
+      stomach,
+      liver,
+      spleen,
       turns,
       profit,
       ...(utensil ? { [`utensil:${utensil}`]: 1 } : {}),
     };
   }
 
-  servingOptions(consumable: Consumable) {
+  evaluateConsumableOptions(id: number) {
     const makeEntry = (serving: { utensil?: number; mayo?: string } = {}) => {
       const servings = Object.entries(serving)
-        .filter(([k, v]) => v !== undefined)
+        .filter(([, v]) => v !== undefined)
         .map(([k, v]) => `${k}=${v}`)
         .join(",");
-      return tuple(`${consumable.id}${servings ? `(${servings})` : ""}`, {
-        ...this.calculateProfit(consumable, serving.utensil, serving.mayo),
-        name: undefined,
-        notes: undefined,
-        [`id:${consumable.id}`]: 1,
+      return tuple(`${id}${servings ? `(${servings})` : ""}`, {
+        ...this.evaluateConsumable(id, serving.utensil, serving.mayo),
+        [`id:${id}`]: 1,
       });
     };
 
     const entries = [makeEntry()];
 
-    if (consumable.stomach > 0) {
+    if (this.getStomach(id) > 0) {
       entries.push(makeEntry({ utensil: 3323 }));
       if (this.options.mayoClinic) {
         for (const mayo of ["mayoflex", "mayodiol", "mayozapine"]) {
@@ -179,19 +197,18 @@ export abstract class Planner {
         }
       }
     }
-    if (consumable.liver > 0) {
+    if (this.getLiver(id) > 0) {
       entries.push(makeEntry({ utensil: 3324 }));
     }
 
-    // Filtering out negative profit entries here is an effective optimisation before the solver is run.
-    return entries.filter((e) => e[1].profit > 0);
+    return entries.filter((e) => e !== null);
   }
 
   plan() {
     const { stomach = 15, liver = 14, spleen = 15, limits = {} } = this.options;
 
     const variables = Object.fromEntries(
-      this.getConsumables().flatMap((c) => this.servingOptions(c)),
+      this.getConsumables().flatMap((id) => this.evaluateConsumableOptions(id)),
     );
 
     if (this.options.sweetSynthesis) {

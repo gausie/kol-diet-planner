@@ -1,6 +1,4 @@
 import { describe, expect, it } from "vitest";
-import * as fs from "node:fs/promises";
-import { Planner } from "./planner";
 import { NodePlanner } from "./NodePlanner";
 
 describe("Planner", async () => {
