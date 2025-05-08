@@ -62,3 +62,5 @@ export function isPizza(consumable: Consumable) {
 export function isMartini(consumable: Consumable) {
   return consumable.notes.includes("MARTINI");
 }
+
+export const tuple = <T extends any[]>(...args: T): T => args;

@@ -8,6 +8,7 @@ import {
   isSalad,
   isSaucy,
   isWine,
+  tuple,
 } from "./utils";
 
 export type PlannerOptions = {
@@ -159,15 +160,12 @@ export abstract class Planner {
         .filter(([k, v]) => v !== undefined)
         .map(([k, v]) => `${k}=${v}`)
         .join(",");
-      return [
-        `${consumable.id}${servings ? `(${servings})` : ""}`,
-        {
-          ...this.calculateProfit(consumable, serving.utensil, serving.mayo),
-          name: undefined,
-          notes: undefined,
-          [`id:${consumable.id}`]: 1,
-        },
-      ];
+      return tuple(`${consumable.id}${servings ? `(${servings})` : ""}`, {
+        ...this.calculateProfit(consumable, serving.utensil, serving.mayo),
+        name: undefined,
+        notes: undefined,
+        [`id:${consumable.id}`]: 1,
+      });
     };
 
     const entries = [makeEntry()];
@@ -185,7 +183,8 @@ export abstract class Planner {
       entries.push(makeEntry({ utensil: 3324 }));
     }
 
-    return entries;
+    // Filtering out negative profit entries here is an effective optimisation before the solver is run.
+    return entries.filter((e) => e[1].profit > 0);
   }
 
   plan() {
