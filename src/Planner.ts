@@ -27,6 +27,7 @@ export type PlannerOptions = {
     | "Accordion Thief";
   sweetSynthesis?: boolean;
   mayoClinic?: boolean;
+  mafiaPinkyRing?: boolean;
 };
 
 type ServingOptions = {
@@ -107,9 +108,15 @@ export abstract class Planner {
         break;
     }
 
-    // Refined Palate
+    // Wine buffs
     if (attributes.wine) {
+      // Refined Palate
       turns += Math.floor(turns * 0.25);
+
+      // Mafia Pinky Ring
+      if (this.options.mafiaPinkyRing) {
+        turns += Math.round(turns * 0.125);
+      }
     }
 
     // Ode to Booze
