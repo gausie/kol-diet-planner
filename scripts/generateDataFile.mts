@@ -59,19 +59,10 @@ const effects = result.allEffects?.nodes
     modifiers: e.effectModifierByEffect?.modifiers || {},
   }));
 
-const prices: Record<number, number> = {};
-
-for (const id of consumables.map((c) => c.id).concat(3323, 3324)) {
-  const response = await fetch(`https://pricegun.loathers.net/api/${id}`);
-  const json = (await response.json()) as { value: number };
-  prices[id] = Math.round(json.value);
-}
-
 await fs.writeFile(
   `./data-${dateString}.json`,
   JSON.stringify({
     consumables,
     effects,
-    prices,
   }),
 );

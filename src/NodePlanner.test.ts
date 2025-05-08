@@ -18,6 +18,8 @@ describe("Planner", async () => {
     mafiaPinkyRing: true,
   });
 
+  await planner.load();
+
   it("plans", async () => {
     const plan = planner.plan();
     console.log(plan);

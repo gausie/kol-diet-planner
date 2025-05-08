@@ -14,7 +14,6 @@ type Data = {
     effect: string;
     effectDuration: number;
   }[];
-  prices: Record<number, number>;
   effects: {
     id: number;
     name: string;
@@ -24,11 +23,20 @@ type Data = {
 
 export class NodePlanner extends Planner {
   data: Data;
+  prices: Record<number, number> = {};
 
   constructor(options: PlannerOptions) {
     super(options);
 
     this.data = JSON.parse(fs.readFileSync("./data.json", "utf-8"));
+  }
+
+  async load() {
+    const response = await fetch("https://pricegun.loathers.net/api/all");
+    const json = (await response.json()) as { value: number; itemId: number }[];
+    this.prices = Object.fromEntries(
+      json.map((item) => [item.itemId, item.value]),
+    );
   }
 
   getConsumables(): number[] {
@@ -74,6 +82,6 @@ export class NodePlanner extends Planner {
   }
 
   getPrice(id: number) {
-    return this.data.prices[id] ?? 0;
+    return this.prices[id] ?? 0;
   }
 }
