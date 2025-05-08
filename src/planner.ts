@@ -29,6 +29,11 @@ export type PlannerOptions = {
   mayoClinic?: boolean;
 };
 
+type ServingOptions = {
+  utensil?: number;
+  mayo?: string;
+};
+
 export abstract class Planner {
   options: PlannerOptions;
 
@@ -75,7 +80,7 @@ export abstract class Planner {
     return profit;
   }
 
-  evaluateConsumable(id: number, utensil?: number, mayo?: string) {
+  evaluateConsumable(id: number, options: ServingOptions) {
     const attributes = this.getAttributes(id);
 
     // Vampyre food cannot be eaten in a normal ascension
@@ -93,7 +98,7 @@ export abstract class Planner {
     let spleen = this.getSpleen(id) - (attributes.cleansesSpleen ?? 0);
 
     // Utensils
-    switch (utensil) {
+    switch (options.utensil) {
       case 3323: // salad fork
         turns += Math.ceil(turns * (attributes.salad ? 0.5 : 0.3));
         break;
@@ -136,7 +141,7 @@ export abstract class Planner {
     // Mayo Clinic
     let effectDuration = this.getItemEffectDuration(id);
     if (this.options.mayoClinic && stomach > 0) {
-      switch (mayo) {
+      switch (options.mayo) {
         case "mayoflex":
           turns += 1;
           break;
@@ -154,8 +159,8 @@ export abstract class Planner {
     let profit = turns * this.options.valueOfAdventure - price;
 
     // If we are using a utensil for this consumable, take into account the extra cost
-    if (utensil) {
-      profit -= this.getPrice(utensil);
+    if (options.utensil) {
+      profit -= this.getPrice(options.utensil);
     }
 
     // And if the item grants an effect, take into account its expected value
@@ -165,25 +170,28 @@ export abstract class Planner {
     if (profit < 0) return null;
 
     return {
+      // Meta-resources to allow us to constrain consumables where appropriate
+      [`id:${id}`]: 1,
+      ...(options.utensil ? { [`utensil:${options.utensil}`]: 1 } : {}),
+      // Resources consumed
       stomach,
       liver,
       spleen,
+      // Resources generated
       turns,
       profit,
-      ...(utensil ? { [`utensil:${utensil}`]: 1 } : {}),
     };
   }
 
   evaluateConsumableOptions(id: number) {
-    const makeEntry = (serving: { utensil?: number; mayo?: string } = {}) => {
-      const servings = Object.entries(serving)
+    const makeEntry = (options: ServingOptions = {}) => {
+      const evaluated = this.evaluateConsumable(id, options);
+      if (!evaluated) return null;
+      const servings = Object.entries(options)
         .filter(([, v]) => v !== undefined)
         .map(([k, v]) => `${k}=${v}`)
         .join(",");
-      return tuple(`${id}${servings ? `(${servings})` : ""}`, {
-        ...this.evaluateConsumable(id, serving.utensil, serving.mayo),
-        [`id:${id}`]: 1,
-      });
+      return tuple(`${id}${servings ? `(${servings})` : ""}`, evaluated);
     };
 
     const entries = [makeEntry()];
