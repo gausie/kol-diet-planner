@@ -87,7 +87,7 @@ export abstract class Planner {
     // Vampyre food cannot be eaten in a normal ascension
     if (attributes.vampyre) return null;
 
-    const price = this.getPrice(id);
+    let price = this.getPrice(id);
 
     // Untradeable or otherwise unavailable
     if (price === 0) return null;
@@ -98,13 +98,33 @@ export abstract class Planner {
     let stomach = this.getStomach(id) - (attributes.cleansesStomach ?? 0);
     let spleen = this.getSpleen(id) - (attributes.cleansesSpleen ?? 0);
 
+    const chasers: string[] = [];
+    const voa = this.options.valueOfAdventure;
+
+    // Munchies pill
+    if (stomach > 0) {
+      const munchiesTurns = (() => {
+        if (turns < 1) return 0;
+        if (turns < 4) return 3;
+        if (turns < 7) return 2;
+        return 1;
+      })();
+      if (this.getPrice(1619) < voa * munchiesTurns) {
+        chasers.push("munchies");
+        price += this.getPrice(1619);
+        turns += munchiesTurns;
+      }
+    }
+
     // Utensils
     switch (options.utensil) {
       case 3323: // salad fork
         turns += Math.ceil(turns * (attributes.salad ? 0.5 : 0.3));
+        price += this.getPrice(3323);
         break;
       case 3324: // frosty mug
         turns += Math.floor(turns * (attributes.beer ? 0.5 : 0.3));
+        price += this.getPrice(3324);
         break;
     }
 
@@ -162,13 +182,22 @@ export abstract class Planner {
       }
     }
 
-    // Now lets calculate profit based on the turns we know this will generate
-    let profit = turns * this.options.valueOfAdventure - price;
-
-    // If we are using a utensil for this consumable, take into account the extra cost
-    if (options.utensil) {
-      profit -= this.getPrice(options.utensil);
+    // Whetstone
+    if (this.getPrice(11107) < voa) {
+      chasers.push("whetstone");
+      price += this.getPrice(11107);
+      turns += 1;
     }
+
+    // Mini kiwi aioli
+    if (this.getPrice(11598) < voa * stomach) {
+      chasers.push("aioli");
+      price += this.getPrice(11598);
+      turns += stomach;
+    }
+
+    // Now lets calculate profit based on the turns we know this will generate
+    let profit = turns * voa - price;
 
     // And if the item grants an effect, take into account its expected value
     profit += this.calculateEffectProfit(id, effectDuration);
@@ -180,6 +209,7 @@ export abstract class Planner {
       // Meta-resources to allow us to constrain consumables where appropriate
       [`id:${id}`]: 1,
       ...(options.utensil ? { [`utensil:${options.utensil}`]: 1 } : {}),
+      chasers,
       // Resources consumed
       stomach,
       liver,
@@ -194,11 +224,13 @@ export abstract class Planner {
     const makeEntry = (options: ServingOptions = {}) => {
       const evaluated = this.evaluateConsumable(id, options);
       if (!evaluated) return null;
+      const { chasers, ...values } = evaluated;
       const servings = Object.entries(options)
         .filter(([, v]) => v !== undefined)
         .map(([k, v]) => `${k}=${v}`)
+        .concat(chasers)
         .join(",");
-      return tuple(`${id}${servings ? `(${servings})` : ""}`, evaluated);
+      return tuple(`${id}${servings ? `(${servings})` : ""}`, values);
     };
 
     const entries = [makeEntry()];
