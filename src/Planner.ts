@@ -183,6 +183,15 @@ export abstract class Planner {
       }
     }
 
+    // Special Seasoning
+    const [min, max] = this.getTurnRange(id);
+    const seasoningTurns = max - min <= 1 ? 1 : 0.5;
+    if (this.getPrice(9924) < voa * seasoningTurns) {
+      chasers.push("seasoning");
+      price += this.getPrice(9924);
+      turns += seasoningTurns;
+    }
+
     // Whetstone
     if (this.getPrice(11107) < voa) {
       chasers.push("whetstone");
