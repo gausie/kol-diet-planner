@@ -185,19 +185,23 @@ export abstract class Planner {
     }
 
     // Special Seasoning
-    const [min, max] = this.getTurnRange(id);
-    const seasoningTurns = max - min <= 1 ? 1 : 0.5;
-    if (this.getPrice(9924) < voa * seasoningTurns) {
-      chasers.push("seasoning");
-      price += this.getPrice(9924);
-      turns += seasoningTurns;
+    if (stomach > 0) {
+      const [min, max] = this.getTurnRange(id);
+      const seasoningTurns = max - min <= 1 ? 1 : 0.5;
+      if (this.getPrice(9924) < voa * seasoningTurns) {
+        chasers.push("seasoning");
+        price += this.getPrice(9924);
+        turns += seasoningTurns;
+      }
     }
 
     // Whetstone
-    if (this.getPrice(11107) < voa) {
-      chasers.push("whetstone");
-      price += this.getPrice(11107);
-      turns += 1;
+    if (stomach > 0) {
+      if (this.getPrice(11107) < voa) {
+        chasers.push("whetstone");
+        price += this.getPrice(11107);
+        turns += 1;
+      }
     }
 
     // Mini kiwi aioli
@@ -324,7 +328,20 @@ export abstract class Planner {
         (acc, [id, q]) => acc + (variables[id]?.turns ?? 0) * q,
         0,
       ),
-      diet: solution.variables,
+      diet: solution.variables
+        .map(([id, q]) => {
+          const match = id.match(/^(.*?)(?:\((.*)\))?$/);
+          if (!match) return null;
+          return {
+            name: Number.isNaN(Number(match[1]))
+              ? match[1]
+              : this.getName(Number(match[1])),
+            id,
+            serving: match[2],
+            quantity: q,
+          };
+        })
+        .filter((e) => e !== null),
     };
   }
 }

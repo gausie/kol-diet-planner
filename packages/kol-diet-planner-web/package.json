@@ -11,6 +11,8 @@
     "format": "prettier --write ."
   },
   "dependencies": {
+    "@tanstack/react-form": "^1.10.0",
+    "kol-diet-planner-web": "workspace:*",
     "react": "^19.1.0",
     "react-dom": "^19.1.0"
   },

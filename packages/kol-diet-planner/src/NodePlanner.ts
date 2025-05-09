@@ -35,6 +35,10 @@ export class NodePlanner extends Planner {
     super(options);
   }
 
+  updateOptions(options: PlannerOptions) {
+    this.options = options;
+  }
+
   async #loadData() {
     const client = createClient();
     const result = await client.query({
