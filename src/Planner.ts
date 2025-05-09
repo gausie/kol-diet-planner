@@ -43,6 +43,7 @@ export abstract class Planner {
   }
 
   abstract getConsumables(): number[];
+  abstract getName(id: number): string;
   abstract getEffectModifiers(name: string): Record<string, string> | undefined;
   abstract getPrice(id: number): number;
   abstract getStomach(id: number): number;
@@ -219,6 +220,7 @@ export abstract class Planner {
       // Meta-resources to allow us to constrain consumables where appropriate
       [`id:${id}`]: 1,
       ...(options.utensil ? { [`utensil:${options.utensil}`]: 1 } : {}),
+      ...(id >= 7589 && id <= 7599 ? { speakeasy: 1 } : {}),
       chasers,
       // Resources consumed
       stomach,
@@ -306,6 +308,7 @@ export abstract class Planner {
         spleen: lessEq(spleen),
         "utensil:3323": lessEq(1), // salad fork
         "utensil:3324": lessEq(1), // frosty mug
+        speakeasy: lessEq(3), // speakeasy drinks
         ...limitConstraints,
       },
       variables,

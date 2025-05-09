@@ -8,20 +8,23 @@ manageFetchMockGlobally();
 describe("Planner", async () => {
   beforeAll(async () => {
     fetchMock
+      .mockGlobal()
       .get(
         "https://pricegun.loathers.net/api/all",
-        200,
-        await fs.readFile(
-          import.meta.dirname + "/__fixtures__/prices.json",
-          "utf-8",
+        JSON.parse(
+          await fs.readFile(
+            import.meta.dirname + "/__fixtures__/prices.json",
+            "utf-8",
+          ),
         ),
       )
       .post(
         "https://data.loathers.net/graphql",
-        200,
-        await fs.readFile(
-          import.meta.dirname + "/__fixtures__/data.json",
-          "utf-8",
+        JSON.parse(
+          await fs.readFile(
+            import.meta.dirname + "/__fixtures__/data.json",
+            "utf-8",
+          ),
         ),
       );
   });

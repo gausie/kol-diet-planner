@@ -116,8 +116,12 @@ export class NodePlanner extends Planner {
     await this.#loadData();
   }
 
-  getConsumables(): number[] {
+  getConsumables() {
     return Object.keys(this.consumables).map(Number);
+  }
+
+  getName(id: number) {
+    return this.consumables[id]?.name ?? `[${id}]`;
   }
 
   getStomach(id: number) {
@@ -164,6 +168,26 @@ export class NodePlanner extends Planner {
   }
 
   getPrice(id: number) {
-    return this.prices[id] ?? 0;
+    switch (id) {
+      case 7589:
+      case 7590:
+      case 7591:
+        return 250;
+      case 7592:
+      case 7593:
+      case 7594:
+      case 7595:
+        return 500;
+      case 7596:
+        return 5000;
+      case 7597:
+        return 10000;
+      case 7598:
+        return 20000;
+      case 7599:
+        return 100000;
+      default:
+        return this.prices[id] ?? 0;
+    }
   }
 }
