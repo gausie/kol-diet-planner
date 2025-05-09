@@ -1,19 +1,23 @@
 import { createClient } from "data-of-loathing";
-import { Planner, PlannerOptions } from "./Planner";
-import * as fs from "node:fs";
+import { memoize } from "utils-decorators";
 
-type ConsumableData = {
-  name: string;
-  id: number;
-  turns: number;
-  range: string[];
-  stomach: number;
-  liver: number;
-  spleen: number;
-  notes: string;
-  effect: string;
-  effectDuration: number;
-};
+import { Planner, type PlannerOptions } from "./Planner";
+
+type ConsumableData = Record<
+  number,
+  {
+    name: string;
+    id: number;
+    turns: number;
+    range: [low: number, high: number];
+    stomach: number;
+    liver: number;
+    spleen: number;
+    notes: string;
+    effect: string;
+    effectDuration: number;
+  }
+>;
 
 type EffectData = {
   id: number;
@@ -23,7 +27,7 @@ type EffectData = {
 
 type PriceData = Record<number, number>;
 export class NodePlanner extends Planner {
-  consumables: ConsumableData[] = [];
+  consumables: ConsumableData = {};
   prices: PriceData = {};
   effects: EffectData[] = [];
 
@@ -62,25 +66,32 @@ export class NodePlanner extends Planner {
       },
     });
 
-    this.consumables =
+    this.consumables = Object.fromEntries(
       result.allConsumables?.nodes
         ?.filter((r) => r !== null)
         .map((r) => {
           const modifiers = r.itemById?.itemModifierByItem?.modifiers ?? {};
-          return {
-            id: r.id,
-            liver: r.liver,
-            name: r.itemById?.name || `[${r.id}]`,
-            spleen: r.spleen,
-            stomach: r.stomach,
-            turns: r.adventures,
-            range:
-              r.adventureRange.match(/(-?\d+)(?:-(-?\d+))?/)?.slice(1) ?? [],
-            notes: r.notes || "",
-            effect: modifiers["Effect"] || "",
-            effectDuration: Number(modifiers["Effect Duration"]) || 0,
-          };
-        }) ?? [];
+          return [
+            r.id,
+            {
+              id: r.id,
+              liver: r.liver,
+              name: r.itemById?.name || `[${r.id}]`,
+              spleen: r.spleen,
+              stomach: r.stomach,
+              turns: r.adventures,
+              range: (
+                r.adventureRange.match(/(-?\d+)(?:-(-?\d+))?/)?.slice(1) ?? []
+              )
+                .map((x, i, arr) => (x === undefined ? arr[i - 1] : x))
+                .map(Number) as [number, number],
+              notes: r.notes || "",
+              effect: modifiers["Effect"] || "",
+              effectDuration: Number(modifiers["Effect Duration"]) || 0,
+            },
+          ];
+        }) ?? [],
+    );
 
     this.effects =
       result.allEffects?.nodes
@@ -106,37 +117,42 @@ export class NodePlanner extends Planner {
   }
 
   getConsumables(): number[] {
-    return this.consumables.map((c) => c.id);
+    return Object.keys(this.consumables).map(Number);
   }
 
   getStomach(id: number) {
-    return this.consumables.find((c) => c.id === id)?.stomach ?? 0;
+    return this.consumables[id]?.stomach ?? 0;
   }
 
   getLiver(id: number) {
-    return this.consumables.find((c) => c.id === id)?.liver ?? 0;
+    return this.consumables[id]?.liver ?? 0;
   }
 
   getSpleen(id: number) {
-    return this.consumables.find((c) => c.id === id)?.spleen ?? 0;
+    return this.consumables[id]?.spleen ?? 0;
   }
 
   getTurns(id: number) {
-    return this.consumables.find((c) => c.id === id)?.turns ?? 0;
+    return this.consumables[id]?.turns ?? 0;
+  }
+
+  getTurnRange(id: number) {
+    return this.consumables[id]?.range ?? [0, 0];
   }
 
   getNotes(id: number): string {
-    return this.consumables.find((c) => c.id === id)?.notes ?? "";
+    return this.consumables[id]?.notes ?? "";
   }
 
   getItemEffect(id: number) {
-    return this.consumables.find((c) => c.id === id)?.effect ?? "";
+    return this.consumables[id]?.effect ?? "";
   }
 
   getItemEffectDuration(id: number) {
-    return this.consumables.find((c) => c.id === id)?.effectDuration ?? 0;
+    return this.consumables[id]?.effectDuration ?? 0;
   }
 
+  @memoize()
   getEffectModifiers(effect: string) {
     const effectName = effect.slice(1, -1);
     const match = effectName.match(/\[(\d+)\].*/);

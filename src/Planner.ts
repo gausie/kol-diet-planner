@@ -49,6 +49,7 @@ export abstract class Planner {
   abstract getLiver(id: number): number;
   abstract getSpleen(id: number): number;
   abstract getTurns(id: number): number;
+  abstract getTurnRange(id: number): [low: number, high: number];
   abstract getNotes(id: number): string;
   abstract getItemEffect(id: number): string;
   abstract getItemEffectDuration(id: number): number;

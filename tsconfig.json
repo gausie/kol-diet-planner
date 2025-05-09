@@ -1,0 +1,9 @@
+{
+  "extends": "@tsconfig/node23/tsconfig.json",
+  "compilerOptions": {
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "experimentalDecorators": true
+  },
+  "include": ["src/**/*.ts"]
+}
