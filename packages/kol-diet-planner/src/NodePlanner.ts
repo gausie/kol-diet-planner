@@ -19,17 +19,17 @@ type ConsumableData = Record<
   }
 >;
 
-type EffectData = {
+type EffectData = Record<number, {
   id: number;
   name: string;
   modifiers: Record<string, string>;
-};
+}>;
 
 type PriceData = Record<number, number>;
 export class NodePlanner extends Planner {
   consumables: ConsumableData = {};
   prices: PriceData = {};
-  effects: EffectData[] = [];
+  effects: EffectData = {};
 
   constructor(options: PlannerOptions) {
     super(options);
@@ -98,13 +98,14 @@ export class NodePlanner extends Planner {
     );
 
     this.effects =
-      result.allEffects?.nodes
+      Object.fromEntries(result.allEffects?.nodes
         ?.filter((e) => e !== null)
-        .map((e) => ({
+        .map((e) => ([e.id, {
           id: e.id,
           name: e.name,
           modifiers: e.effectModifierByEffect?.modifiers || {},
-        })) ?? [];
+        }])) ?? []
+      );
   }
 
   async #loadPrices() {
@@ -152,8 +153,15 @@ export class NodePlanner extends Planner {
     return this.consumables[id]?.notes ?? "";
   }
 
-  getItemEffect(id: number) {
-    return this.consumables[id]?.effect ?? "";
+  @memoize()
+  getItemEffectId(id: number) {
+    const name = this.consumables[id]?.effect;
+    if (!name) return 0;
+
+    const effectName = name.slice(1, -1);
+    const match = effectName.match(/\[(\d+)\].*/);
+    if (match) return Number(match[1]);
+    return Object.values(this.effects).find((e) => e.name === effectName)?.id ?? 0;
   }
 
   getItemEffectDuration(id: number) {
@@ -161,14 +169,8 @@ export class NodePlanner extends Planner {
   }
 
   @memoize()
-  getEffectModifiers(effect: string) {
-    const effectName = effect.slice(1, -1);
-    const match = effectName.match(/\[(\d+)\].*/);
-    if (match) {
-      const id = Number(match[1]);
-      return this.effects.find((e) => e.id === id)?.modifiers;
-    }
-    return this.effects.find((e) => e.name === effectName)?.modifiers;
+  getEffectModifiers(id: number) {
+    return this.effects[id]?.modifiers;
   }
 
   getPrice(id: number) {

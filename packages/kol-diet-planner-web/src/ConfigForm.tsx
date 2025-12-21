@@ -110,6 +110,36 @@ export function ConfigForm({ value, onChange }: ConfigFormProps) {
         />
 
         <form.Field
+          name="startingTurns"
+          children={(field) => (
+            <div>
+              <label htmlFor={field.name}>Starting turns</label>
+              <input
+                id={field.name}
+                type="number"
+                value={field.state.value ?? ""}
+                onChange={(e) => field.handleChange(Number(e.target.value))}
+              />
+            </div>
+          )}
+        />
+
+        <form.Field
+          name="expectedTurns"
+          children={(field) => (
+            <div>
+              <label htmlFor={field.name}>Expected turns (sorry)</label>
+              <input
+                id={field.name}
+                type="number"
+                value={field.state.value ?? ""}
+                onChange={(e) => field.handleChange(Number(e.target.value))}
+              />
+            </div>
+          )}
+        />
+
+        <form.Field
           name="class"
           children={(field) => (
             <div>

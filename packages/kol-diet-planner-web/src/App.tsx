@@ -8,6 +8,7 @@ const defaultConfig: PlannerOptions = {
   liver: 14,
   spleen: 15,
   valueOfAdventure: 5000,
+  expectedTurns: 300,
 };
 
 export function App() {

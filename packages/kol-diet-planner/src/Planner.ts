@@ -12,6 +12,10 @@ export type PlannerOptions = {
   valueOfAdventure: number;
   /** Base meat drop for monsters, used to value +meat effects */
   baseMeat?: number;
+  /** Turns we expect to run */
+  expectedTurns: number;
+  /** Starting turns */
+  startingTurns?: number;
   /** Map of items id to top consumption limit thereof. Applied over a sane set of defaults */
   limits?: { [itemId: number]: number };
   pizzaLover?: boolean;
@@ -44,7 +48,7 @@ export abstract class Planner {
 
   abstract getConsumables(): number[];
   abstract getName(id: number): string;
-  abstract getEffectModifiers(name: string): Record<string, string> | undefined;
+  abstract getEffectModifiers(effectId: number): Record<string, string> | undefined;
   abstract getPrice(id: number): number;
   abstract getStomach(id: number): number;
   abstract getLiver(id: number): number;
@@ -52,7 +56,7 @@ export abstract class Planner {
   abstract getTurns(id: number): number;
   abstract getTurnRange(id: number): [low: number, high: number];
   abstract getNotes(id: number): string;
-  abstract getItemEffect(id: number): string;
+  abstract getItemEffectId(id: number): number;
   abstract getItemEffectDuration(id: number): number;
 
   getAttributes(id: number): Attributes {
@@ -65,10 +69,10 @@ export abstract class Planner {
   }
 
   calculateEffectProfit(id: number, duration = this.getItemEffectDuration(id)) {
-    const effect = this.getItemEffect(id);
-    if (!effect) return 0;
+    const effectId = this.getItemEffectId(id);
+    if (!effectId) return 0;
 
-    const modifiers = this.getEffectModifiers(effect);
+    const modifiers = this.getEffectModifiers(effectId);
     if (!modifiers) return 0;
 
     let profit = 0;
@@ -83,7 +87,7 @@ export abstract class Planner {
     return profit;
   }
 
-  evaluateConsumable(id: number, options: ServingOptions) {
+  evaluateConsumable(id: number, options: ServingOptions): { values: Record<string, number>, chasers: string[] } | null {
     const attributes = this.getAttributes(id);
 
     // Vampyre food cannot be eaten in a normal ascension
@@ -215,24 +219,25 @@ export abstract class Planner {
     let profit = turns * voa - price;
 
     // And if the item grants an effect, take into account its expected value
-    profit += this.calculateEffectProfit(id, effectDuration);
+    const effectProfit = this.calculateEffectProfit(id, effectDuration);
+    profit += effectProfit;
 
     // Filtering out negative profit entries here is an effective optimisation before the solver is run.
     if (profit < 0) return null;
 
     return {
-      // Meta-resources to allow us to constrain consumables where appropriate
-      [`id:${id}`]: 1,
-      ...(options.utensil ? { [`utensil:${options.utensil}`]: 1 } : {}),
-      ...(id >= 7589 && id <= 7599 ? { speakeasy: 1 } : {}),
+      values: {
+        [`id:${id}`]: 1,
+        ...(options.utensil ? { [`utensil:${options.utensil}`]: 1 } : {}),
+        ...(id >= 7589 && id <= 7599 ? { speakeasy: 1 } : {}),
+        ...(effectProfit > 0 ? { [`effect:${this.getItemEffectId(id)}`]: effectDuration } : {}),
+        stomach,
+        liver,
+        spleen,
+        turns,
+        profit,
+      },
       chasers,
-      // Resources consumed
-      stomach,
-      liver,
-      spleen,
-      // Resources generated
-      turns,
-      profit,
     };
   }
 
@@ -240,7 +245,7 @@ export abstract class Planner {
     const makeEntry = (options: ServingOptions = {}) => {
       const evaluated = this.evaluateConsumable(id, options);
       if (!evaluated) return null;
-      const { chasers, ...values } = evaluated;
+      const { values, chasers } = evaluated;
       const servings = Object.entries(options)
         .filter(([, v]) => v !== undefined)
         .map(([k, v]) => `${k}=${v}`)
@@ -267,6 +272,19 @@ export abstract class Planner {
     return entries.filter((e) => e !== null);
   }
 
+  formatResult([id, q]: [string, number]) {
+    const match = id.match(/^(.*?)(?:\((.*)\))?$/);
+    if (!match) return null;
+    return {
+      name: Number.isNaN(Number(match[1]))
+        ? match[1]
+        : this.getName(Number(match[1])),
+      id,
+      serving: match[2],
+      quantity: q,
+    };
+  }
+  
   plan() {
     const { stomach = 15, liver = 14, spleen = 15, limits = {} } = this.options;
 
@@ -281,8 +299,11 @@ export abstract class Planner {
         stomach: 0,
         liver: 0,
         spleen: 1,
+        "effect:2175": 30,
       };
     }
+
+    const effectConstraints = Object.values(variables).flatMap(v => Object.keys(v)).filter((k) => k.startsWith("effect:")).reduce((acc, e) => ({ ...acc, [e]: lessEq(this.options.expectedTurns + (this.options.startingTurns ?? 40)) }), {});
 
     const limitConstraints = Object.fromEntries(
       Object.entries({
@@ -313,6 +334,7 @@ export abstract class Planner {
         "utensil:3323": lessEq(1), // salad fork
         "utensil:3324": lessEq(1), // frosty mug
         speakeasy: lessEq(3), // speakeasy drinks
+        ...effectConstraints,
         ...limitConstraints,
       },
       variables,
@@ -329,18 +351,7 @@ export abstract class Planner {
         0,
       ),
       diet: solution.variables
-        .map(([id, q]) => {
-          const match = id.match(/^(.*?)(?:\((.*)\))?$/);
-          if (!match) return null;
-          return {
-            name: Number.isNaN(Number(match[1]))
-              ? match[1]
-              : this.getName(Number(match[1])),
-            id,
-            serving: match[2],
-            quantity: q,
-          };
-        })
+        .map(v => this.formatResult(v))
         .filter((e) => e !== null),
     };
   }
